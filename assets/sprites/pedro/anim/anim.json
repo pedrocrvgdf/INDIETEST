@@ -1,0 +1,56 @@
+{
+ "canvas": [
+  820,
+  660
+ ],
+ "anc": [
+  330,
+  640
+ ],
+ "w": 492,
+ "h": 396,
+ "footX": 198,
+ "footY": 384,
+ "anims": {
+  "andar": [
+   "andar_0",
+   "andar_1",
+   "andar_2",
+   "andar_3",
+   "andar_4",
+   "andar_5",
+   "andar_6",
+   "andar_7"
+  ],
+  "parado": [
+   "parado_0",
+   "parado_1",
+   "parado_2",
+   "parado_3"
+  ],
+  "pulo": [
+   "pulo_0",
+   "pulo_1"
+  ],
+  "hit": [
+   "hit_0",
+   "hit_1"
+  ],
+  "vitoria": [
+   "vitoria_0",
+   "vitoria_1"
+  ],
+  "soco": [
+   "soco_0",
+   "soco_1",
+   "soco_2",
+   "soco_3"
+  ],
+  "chute": [
+   "chute_0",
+   "chute_1",
+   "chute_2",
+   "chute_3"
+  ]
+ }
+}

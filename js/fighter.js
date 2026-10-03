@@ -66,7 +66,7 @@ class Fighter {
         this.vx = this.vx + (this.vxAlvo - this.vx) * Math.min(1, dt * 18);
         if (Math.abs(this.vx) < 8 && !this.vxAlvo) this.vx = 0;
         this.state = this.vxAlvo ? 'walk' : 'idle';
-        if (this.state === 'walk') this.andar += dt * 9;
+        if (this.state === 'walk') this.andar += dt * Math.abs(this.vx) / 38;
         break;
       case 'jump':
         if (p.soco && this.iniciar('soco')) break;
@@ -134,52 +134,69 @@ class Fighter {
     return 'acertou';
   }
   poseAtual() {
+    const A = (n) => this.temAnim(n) ? n : null;
+    const seq = (base, i) => A(base + '_' + i) || this.poseEstatica();
     switch (this.state) {
       case 'block': return 'defesa';
-      case 'attack': case 'dash': case 'special': return (this.golpe && this.golpe.pose) || 'parado';
-      default: return 'parado';
+      case 'special': return (this.golpe && this.golpe.pose) || 'parado';
+      case 'attack': case 'dash': {
+        const g = this.golpe; if (!g) return 'parado';
+        if (this.state === 'dash') return seq('soco', 2);
+        const base = g.pose === 'chute' ? 'chute' : 'soco', f = this.fase();
+        if (f === 'startup') return seq(base, this.timer < g.startup * 0.5 ? 0 : 1);
+        if (f === 'active') return seq(base, 2);
+        return seq(base, 3);
+      }
+      case 'walk': { let i = Math.floor(this.andar * 1.4) % 8; if (Math.sign(this.vx) !== this.face) i = 7 - i; return seq('andar', i); }
+      case 'jump': return seq('pulo', this.vy < 0 ? 0 : 1);
+      case 'hit': return seq('hit', this.timer < 0.12 ? 0 : 1);
+      case 'ko': return seq('hit', 0);
+      case 'win': return seq('vitoria', Math.floor(this.timer * 5) % 2);
+      default: return seq('parado', Math.floor(this.timer * 4) % 4);
     }
   }
-  // pose de transição: durante startup/recovery mistura 'parado' com a pose do golpe
-  mistura() {
-    const g = this.golpe; if (!g || !['attack', 'dash', 'special'].includes(this.state)) return 1;
-    const f = this.fase(); const ativo = g.active || g.duracao || 0;
-    if (f === 'startup') return Math.min(1, this.timer / Math.max(0.001, g.startup));
-    if (f === 'recovery') { const rt = this.timer - g.startup - ativo, ini = Math.max(0, g.recovery - 0.12); return rt < ini ? 1 : Math.max(0, 1 - (rt - ini) / 0.12); }
-    return 1;
+  poseEstatica() { return this.state === 'block' ? 'defesa' : (this.golpe && this.golpe.pose) || 'parado'; }
+  quadro(nome) {
+    const a = this.img.anim && this.img.anim[nome], am = window.ANIM_META && ANIM_META[this.id];
+    if (a && am) return { img: a, w: am.w, h: am.h, footX: am.footX };
+    const img = this.img[nome], m = this.meta[nome]; if (!img || !m) return null;
+    return { img, w: m.w, h: m.h, footX: m.footX };
   }
+  temAnim(nome) { return !!(this.img.anim && this.img.anim[nome]); }
+  // Corte seco entre quadros, como nos arcades (sem transição com fantasma).
+  mistura() { return 1; }
   drawPose(ctx, pose, alpha) {
-    const img = this.img[pose], m = this.meta[pose]; if (!img || !m) return;
+    const q = this.quadro(pose); if (!q) return; const { img, w, h, footX } = q;
     ctx.globalAlpha = alpha;
     if (this.flash > 0 || this.enxaqueca > 0) {
       const sc = this.scratch, c2 = sc.getContext('2d');
       if (sc.width !== img.width || sc.height !== img.height) { sc.width = img.width; sc.height = img.height; }
       c2.clearRect(0, 0, sc.width, sc.height); c2.drawImage(img, 0, 0); c2.globalCompositeOperation = 'source-atop';
       c2.fillStyle = this.flash > 0 ? 'rgba(255,40,40,.6)' : 'rgba(255,0,80,' + (0.25 + Math.sin(performance.now() / 50) * 0.15) + ')'; c2.fillRect(0, 0, sc.width, sc.height); c2.globalCompositeOperation = 'source-over';
-      ctx.drawImage(sc, -m.footX, -m.h, m.w, m.h);
-    } else ctx.drawImage(img, -m.footX, -m.h, m.w, m.h);
+      ctx.drawImage(sc, -footX, -h, w, h);
+    } else ctx.drawImage(img, -footX, -h, w, h);
     ctx.globalAlpha = 1;
   }
   draw(ctx, t) {
-    const pose = this.poseAtual(); if (!this.img[pose]) return;
+    const pose = this.poseAtual(); if (!this.quadro(pose)) return;
     // rastro do avanço
-    for (const r of this.rastro) { ctx.save(); ctx.globalAlpha = r.t * 1.6; ctx.translate(r.x, r.y); ctx.scale(r.face, 1); const m = this.meta.soco; ctx.drawImage(this.img.soco, -m.footX, -m.h, m.w, m.h); ctx.restore(); }
+    for (const r of this.rastro) { const q = this.quadro(this.temAnim('soco_2') ? 'soco_2' : 'soco'); if (!q) break; ctx.save(); ctx.globalAlpha = r.t * 1.6; ctx.translate(r.x, r.y); ctx.scale(r.face, 1); ctx.drawImage(q.img, -q.footX, -q.h, q.w, q.h); ctx.restore(); }
     const sombraW = 120 + (this.chao - this.y) * 0.1; ctx.fillStyle = 'rgba(0,0,0,' + (0.28 - (this.chao - this.y) * 0.0004) + ')'; ctx.beginPath(); ctx.ellipse(this.x, this.chao + 6, sombraW / 2, 10, 0, 0, 7); ctx.fill();
     ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.face, 1);
     if (this.hp < this.hpMax * 0.3 && this.vivo && this.char.pressao === 'sayajin') aura(ctx, t, this.alturaCorpo);
     let sx = 1, sy = 1, dx = 0, rot = 0;
-    if (this.state === 'idle') { sy = 1 + Math.sin(t * 5) * 0.015; sx = 1 - Math.sin(t * 5) * 0.008; }
-    if (this.state === 'walk') { sy = 1 + Math.sin(this.andar) * 0.035; rot = Math.sign(this.vx) * this.face * 0.03; dx = Math.sin(this.andar * 0.5) * 3; }
+    if (this.state === 'idle' && !this.temAnim('parado_0')) { sy = 1 + Math.sin(t * 5) * 0.015; sx = 1 - Math.sin(t * 5) * 0.008; }
+    if (this.state === 'walk') { if (!this.temAnim('andar_0')) sy = 1 + Math.sin(this.andar) * 0.035; rot = Math.sign(this.vx) * this.face * 0.025; }
     if (this.state === 'jump') { sy = 1 + Math.max(-0.12, Math.min(0.12, -this.vy / 6000)); sx = 2 - sy; }
     const mist = this.mistura();
-    if (this.state === 'attack' || this.state === 'dash') { const f = this.fase(); if (f === 'startup') { sx = 1 - 0.08 * (1 - mist); dx = -10 * (1 - mist); } else if (f === 'active') { sx = 1.04; dx = 14; } else { dx = 14 * mist; } }
+    if (this.state === 'attack' || this.state === 'dash') { const f = this.fase(); if (f === 'active') { sx = 1.03; dx = 12; } else if (f === 'recovery') { dx = 12 * mist; } }
     if (this.state === 'special') { const f = this.fase(); if (f === 'startup') { sx = 0.97 + Math.sin(t * 60) * 0.02; } }
     if (this.state === 'hit') { dx = -6 + Math.sin(t * 90) * 5; sx = 0.94; sy = 1.04; }
     if (this.state === 'win') { sy = 1 + Math.abs(Math.sin(t * 7)) * 0.06; }
     if (this.state === 'ko') { rot = -this.anguloKO * Math.PI / 2 * 0.95; }
     sy *= 1 - this.squash; sx *= 1 + this.squash * 0.6;
     ctx.rotate(rot); ctx.translate(dx, 0); ctx.scale(sx, sy);
-    if (mist < 1) { this.drawPose(ctx, 'parado', 1); this.drawPose(ctx, pose, mist); } else this.drawPose(ctx, pose, 1);
+    if (mist < 1) { this.drawPose(ctx, this.temAnim('parado_0') ? 'parado_0' : 'parado', 1); this.drawPose(ctx, pose, mist); } else this.drawPose(ctx, pose, 1);
     // arco de impacto (swoosh) nos quadros ativos de soco/chute
     if (this.state === 'attack' && this.golpe && !this.golpe.tipo && this.fase() === 'active') { const g = this.golpe, cy = -(g.yTop + g.yBot) / 2, r = g.reach * 0.9; ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(20, cy, r, -0.55, 0.55); ctx.stroke(); ctx.strokeStyle = this.char.cor; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(20, cy, r - 12, -0.45, 0.45); ctx.stroke(); }
     ctx.restore();

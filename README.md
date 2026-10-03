@@ -56,6 +56,14 @@ tools/slice_sprites.py fatia uma folha de 5 poses em sprites separados
 3. Regere `assets/sprites/meta.js`: `python3 tools/build_meta.py`.
 4. Inclua o bloco em `js/characters.js` e o id em `ROSTER`.
 
+## Animação por recorte
+
+Cada pose estática vira uma sequência de quadros com `tools/rig_frames.py` (pernas girando no quadril para andar e pular,
+braço do soco esticando, perna do chute subindo, tronco inclinando ao apanhar). Os quadros ficam em `assets/sprites/<id>/anim/`
+e são listados em `anim.json`; `tools/build_meta.py` gera `anim_meta.js`. Para usar quadros desenhados por IA, basta
+substituir os PNGs mantendo os nomes (`andar_0..7`, `soco_0..3`, `chute_0..3`, `pulo_0..1`, `hit_0..1`, `vitoria_0..1`, `parado_0..3`)
+e a âncora do pé definida em `anim.json`.
+
 ## Falas gravadas
 
 Coloque arquivos MP3 em `assets/voices/<id>/` com os nomes `entrada.mp3`, `vitoria.mp3` e `especial.mp3`.

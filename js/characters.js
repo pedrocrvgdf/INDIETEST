@@ -55,17 +55,18 @@ window.BOSS = { id: 'convenio', nome: 'O CONVÊNIO', partes: ['Unimed', 'Bradesc
 window.SPRITES = {};
 window.loadSprites = function (onProgress) {
   const jobs = [];
+  const carregar = (dest, chave, src) => jobs.push(new Promise(res => {
+    const img = new Image();
+    img.onload = () => { dest[chave] = img; res(); };
+    img.onerror = () => { dest[chave] = null; res(); };
+    img.src = src;
+  }));
   for (const id of ROSTER) {
-    SPRITES[id] = {};
-    const poses = Object.keys(SPRITE_META[id]).concat(['retrato']);
-    for (const pose of poses) {
-      jobs.push(new Promise(res => {
-        const img = new Image();
-        img.onload = () => { SPRITES[id][pose] = img; res(); };
-        img.onerror = () => { SPRITES[id][pose] = null; res(); };
-        img.src = 'assets/sprites/' + id + '/' + pose + '.png';
-      }));
-    }
+    SPRITES[id] = { anim: {} };
+    for (const pose of Object.keys(SPRITE_META[id]).concat(['retrato'])) carregar(SPRITES[id], pose, 'assets/sprites/' + id + '/' + pose + '.png');
+    // quadros de animação por recorte (tools/rig_frames.py): andar, pulo, soco, chute, hit, vitória, parado
+    const am = window.ANIM_META && ANIM_META[id];
+    if (am) for (const lista of Object.values(am.anims)) for (const nome of lista) carregar(SPRITES[id].anim, nome, 'assets/sprites/' + id + '/anim/' + nome + '.png');
   }
   let done = 0;
   jobs.forEach(j => j.then(() => { done++; onProgress && onProgress(done / jobs.length); }));
