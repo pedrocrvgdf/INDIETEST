@@ -150,7 +150,7 @@ class Match {
     this.stage.draw(ctx, this.cam, this.t, W, H);
     ctx.save(); ctx.translate(-this.cam, 0);
     const ordem = this.f1.ocupado && !this.f2.ocupado ? [this.f2, this.f1] : [this.f1, this.f2];
-    for (const f of ordem) { if (f.state === 'special' && f.golpe && f.golpe.tipo === 'raio' && f.fase() === 'active') this.raio(ctx, f); f.draw(ctx, this.t); }
+    for (const f of ordem) { f.draw(ctx, this.t); if (f.state === 'special' && f.golpe && f.golpe.tipo === 'raio' && f.fase() !== 'startup') this.raio(ctx, f); }
     for (const p of this.projeteis) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.sign(p.vx));
       if (p.img) ctx.drawImage(p.img, -p.w / 2, -p.h / 2, p.w, p.h);
@@ -164,12 +164,26 @@ class Match {
     if (this.pausado) this.menuPausa(ctx);
   }
   raio(ctx, f) {
-    const g = f.golpe, x0 = f.x + f.face * 60, y0 = f.y - g.yTop + 30, fim = f.face > 0 ? this.cam + W + 100 : this.cam - 100;
+    const g = f.golpe, o = g.origem || { dx: 40, dy: -250 };
+    const x0 = f.x + f.face * o.dx, y0 = f.y + o.dy, fim = f.face > 0 ? this.cam + W + 60 : this.cam - 60, L = Math.abs(fim - x0);
+    const prog = Math.min(1, (f.timer - g.startup) / 0.12); // o feixe cresce em 120ms
+    const xf = x0 + (fim - x0) * prog, hf = 8 + 130 * prog;
     const cores = ['#e53935', '#fdd835', '#43a047', '#1e88e5'];
-    ctx.save(); ctx.globalAlpha = 0.9;
-    const grad = ctx.createLinearGradient(x0, 0, fim, 0); grad.addColorStop(0, 'rgba(255,255,255,.95)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad; ctx.beginPath(); ctx.moveTo(x0, y0 - 8); ctx.lineTo(fim, y0 - 110); ctx.lineTo(fim, y0 + 110); ctx.lineTo(x0, y0 + 8); ctx.fill();
-    for (let i = 0; i < 26; i++) { const p = ((this.t * 1.6 + i * 0.09) % 1), x = x0 + (fim - x0) * p, y = y0 + (i % 5 - 2) * 40 * p + Math.sin(this.t * 10 + i) * 6; ctx.fillStyle = cores[i % 4]; ctx.save(); ctx.translate(x, y); ctx.rotate(this.t * 4 + i); const s = 10 + 16 * p; ctx.fillRect(-s / 2, -s / 2, s, s); ctx.beginPath(); ctx.arc(s / 2, 0, s / 4, 0, 7); ctx.arc(0, -s / 2, s / 4, 0, 7); ctx.fill(); ctx.restore(); }
+    const rec = f.timer - g.startup - g.duracao; if (rec > 0.18) return; // some em 180ms após o fim
+    ctx.save(); if (rec > 0) ctx.globalAlpha = 1 - rec / 0.18;
+    // brilho externo
+    const glow = ctx.createLinearGradient(x0, 0, fim, 0); glow.addColorStop(0, 'rgba(255,255,200,.9)'); glow.addColorStop(1, 'rgba(255,230,120,.35)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.moveTo(x0, y0 - 10); ctx.lineTo(xf, y0 - hf - 24); ctx.lineTo(xf, y0 + hf + 24); ctx.lineTo(x0, y0 + 10); ctx.fill();
+    // corpo do feixe: faixas coloridas tipo quebra-cabeça
+    const ga = ctx.globalAlpha; cores.forEach((c, i) => { const a0 = -1 + i * 0.5, a1 = a0 + 0.5; ctx.fillStyle = c; ctx.globalAlpha = 0.85 * ga; ctx.beginPath(); ctx.moveTo(x0, y0 + a0 * 6); ctx.lineTo(xf, y0 + a0 * hf); ctx.lineTo(xf, y0 + a1 * hf); ctx.lineTo(x0, y0 + a1 * 6); ctx.fill(); });
+    ctx.globalAlpha = ga;
+    // miolo branco
+    const core = ctx.createLinearGradient(x0, 0, fim, 0); core.addColorStop(0, 'rgba(255,255,255,1)'); core.addColorStop(1, 'rgba(255,255,255,.6)');
+    ctx.fillStyle = core; ctx.beginPath(); ctx.moveTo(x0, y0 - 3); ctx.lineTo(xf, y0 - hf * 0.22); ctx.lineTo(xf, y0 + hf * 0.22); ctx.lineTo(x0, y0 + 3); ctx.fill();
+    // peças voando ao longo de todo o feixe
+    for (let i = 0; i < 34; i++) { const p = ((this.t * 1.4 + i * 0.071) % 1); if (p > prog) continue; const x = x0 + (fim - x0) * p, h = 8 + 130 * p, y = y0 + ((i * 7) % 11 - 5) / 5 * h * 0.8 + Math.sin(this.t * 9 + i) * 5; ctx.fillStyle = cores[i % 4]; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2; ctx.save(); ctx.translate(x, y); ctx.rotate(this.t * 5 + i); const s = 10 + 22 * p; peca(ctx, s); ctx.restore(); }
+    // faíscas na origem (olhos)
+    ctx.fillStyle = '#fff'; for (let i = 0; i < 6; i++) { const a = this.t * 20 + i; ctx.beginPath(); ctx.arc(x0 + Math.cos(a) * 14, y0 + Math.sin(a) * 10, 4, 0, 7); ctx.fill(); }
     ctx.restore();
   }
   hud(ctx) {
@@ -208,6 +222,10 @@ class Match {
   }
   // toque/clique durante a partida (menu de pausa)
   pointer(x, y) { if (!this.pausado || !this.pauseBtns) return; for (const b of this.pauseBtns) if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { Audio8.play('confirm'); if (b.i === 0) this.pausado = false; else this.encerrar('sair'); } }
+}
+function peca(ctx, s) { // peça de quebra-cabeça
+  ctx.beginPath(); ctx.rect(-s / 2, -s / 2, s, s); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(s / 2, 0, s / 4, 0, 7); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -s / 2, s / 4, 0, 7); ctx.fill(); ctx.stroke();
 }
 function cerebro(ctx, t) {
   ctx.fillStyle = '#f48fb1'; ctx.beginPath(); ctx.ellipse(0, 0, 30, 24, 0, 0, 7); ctx.fill();

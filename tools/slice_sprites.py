@@ -5,10 +5,11 @@ Gera: parado, soco, chute, defesa, especial (+ retrato e, se houver, projetil)
 e um sprites_meta.js com largura/altura/âncora dos pés de cada pose.
 """
 import sys, json, os, numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 from scipy import ndimage
 
-TARGET_H = 360   # altura padrão do personagem na pose "parado" (px lógicos)
+TARGET_H = 360   # altura lógica do personagem na pose "parado" (unidade do jogo)
+STORE_H = 600    # altura em pixels do PNG salvo (o jogo reduz na hora de desenhar, mantendo nitidez em telas grandes)
 POSES = ["parado", "soco", "chute", "defesa", "especial"]
 
 def components(alpha):
@@ -46,7 +47,8 @@ def main(sheet, name, dest):
     ordered = ordered[:5]
 
     os.makedirs(dest, exist_ok=True)
-    scale = TARGET_H / (ordered[0]["y1"] - ordered[0]["y0"])
+    scale = TARGET_H / (ordered[0]["y1"] - ordered[0]["y0"])          # lógico
+    pscale = STORE_H / (ordered[0]["y1"] - ordered[0]["y0"])          # pixels salvos
     meta = {}
     for pose, c in zip(POSES, ordered):
         # junta efeitos soltos (faíscas, poeira, balão) que estejam perto desta pose
@@ -69,7 +71,10 @@ def main(sheet, name, dest):
         crop[:, :, 3] = np.where(mask[y0:y1, x0:x1], crop[:, :, 3], 0)
         img = Image.fromarray(crop)
         nw, nh = max(1, round(img.width * scale)), max(1, round(img.height * scale))
-        img = img.resize((nw, nh), Image.LANCZOS if scale < 1 else Image.NEAREST)
+        pw, ph = max(1, round(img.width * pscale)), max(1, round(img.height * pscale))
+        img = img.resize((pw, ph), Image.LANCZOS)
+        if pscale > 1.2:  # ampliação: realça bordas para compensar a folha de baixa resolução
+            img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=90, threshold=2))
         # âncora: centro dos pés = média x das linhas opacas dos 6% inferiores da pose principal
         body = (lab == c["id"])[y0:y1, x0:x1]
         bh = body.shape[0]
@@ -81,7 +86,7 @@ def main(sheet, name, dest):
         img.save(os.path.join(dest, f"{pose}.png"))
         meta[pose] = dict(w=nw, h=nh, footX=round(foot_x * scale), footY=nh,
                           bodyTop=round(body_ys.min() * scale), bodyH=round((body_ys.max() - body_ys.min()) * scale))
-        print(f"{name}/{pose}: {nw}x{nh} footX={meta[pose]['footX']}")
+        print(f"{name}/{pose}: {pw}x{ph}px -> {nw}x{nh} lógico, footX={meta[pose]['footX']}")
 
     # retrato: cabeça da pose parado (28% superiores)
     p = Image.open(os.path.join(dest, "parado.png"))
@@ -105,7 +110,7 @@ def main(sheet, name, dest):
         keep = ((r > 190) & (g < 110) & (b > 90)) | ((abs(r - g) < 25) & (abs(g - b) < 25) & (r > 120))  # rosa ou cinza (tampa)
         crop[:, :, 3] = np.where(keep, crop[:, :, 3], 0)
         Image.fromarray(crop).save(os.path.join(dest, "projetil.png"))
-        meta["projetil"] = dict(w=int(x1 - x0), h=int(y1 - y0))
+        meta["projetil"] = dict(w=round((x1 - x0) * scale / pscale), h=round((y1 - y0) * scale / pscale))
         print(f"{name}/projetil: {x1-x0}x{y1-y0}")
 
     with open(os.path.join(dest, "meta.json"), "w") as f:

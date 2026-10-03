@@ -42,8 +42,8 @@ window.SPRITE_META = {
    "bodyH": 333
   },
   "projetil": {
-   "w": 32,
-   "h": 51
+   "w": 29,
+   "h": 45
   }
  },
  "pedro": {
@@ -80,12 +80,12 @@ window.SPRITE_META = {
    "bodyH": 317
   },
   "especial": {
-   "w": 379,
-   "h": 303,
+   "w": 207,
+   "h": 300,
    "footX": 98,
-   "footY": 303,
+   "footY": 300,
    "bodyTop": 0,
-   "bodyH": 301
+   "bodyH": 300
   }
  }
 };

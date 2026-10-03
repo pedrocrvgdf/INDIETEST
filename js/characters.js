@@ -5,7 +5,7 @@ window.CHARACTERS = {
     id: 'ludmilla', nome: 'Ludmilla', cargo: 'Analista Financeiro Contábil Jr', setor: 'Quitação',
     cor: '#ff3d8f', cor2: '#1b2d5c',
     bio: 'Animada, sorridente e fã do Cristiano Ronaldo. Até a enxaqueca chegar.',
-    hp: 100, velocidade: 330, pulo: 880,
+    hp: 100, velocidade: 380, pulo: 900,
     golpes: {
       soco: { nome: 'Soco', dmg: 7, startup: 0.07, active: 0.12, recovery: 0.16, reach: 175, yTop: 300, yBot: 160, kb: 70, pose: 'soco' },
       chute: { nome: 'Chute', dmg: 10, startup: 0.11, active: 0.14, recovery: 0.24, reach: 245, yTop: 340, yBot: 90, kb: 120, pose: 'chute' },
@@ -27,12 +27,12 @@ window.CHARACTERS = {
     id: 'pedro', nome: 'Pedro Autista', cargo: 'Analista de Gestão Estratégica', setor: 'Gestão Estratégica',
     cor: '#2f7fd6', cor2: '#1f1f1f',
     bio: 'Ama F1, Ayrton Senna e falar o que pensa. Ironia não registra.',
-    hp: 100, velocidade: 310, pulo: 860,
+    hp: 100, velocidade: 360, pulo: 880,
     golpes: {
       soco: { nome: 'Soco PCD', dmg: 8, startup: 0.08, active: 0.12, recovery: 0.17, reach: 185, yTop: 300, yBot: 160, kb: 80, pose: 'soco' },
       chute: { nome: 'Chute TEA', dmg: 11, startup: 0.12, active: 0.15, recovery: 0.26, reach: 240, yTop: 350, yBot: 80, kb: 130, pose: 'chute' },
       poder: { nome: 'Ultrapassagem', tipo: 'dash', dmg: 10, startup: 0.1, duracao: 0.28, recovery: 0.3, dist: 380, reach: 190, yTop: 300, yBot: 140, kb: 150, pose: 'soco', cooldown: 1.3, sfx: 'charge', descricao: 'Avanço estilo Senna na chuva. Nome provisório.' },
-      especial: { nome: 'Poder do Autismo', tipo: 'raio', dmg: 25, startup: 0.4, duracao: 0.6, recovery: 0.45, yTop: 340, yBot: 140, kb: 220, pose: 'especial', descricao: 'Raio óptico de quebra-cabeças. Atravessa a sala inteira.' },
+      especial: { nome: 'Poder do Autismo', tipo: 'raio', dmg: 25, startup: 0.4, duracao: 0.7, recovery: 0.45, yTop: 340, yBot: 140, kb: 220, pose: 'especial', origem: { dx: 37, dy: -245 }, descricao: 'Raio óptico de quebra-cabeças. Atravessa a sala inteira.' },
     },
     bloqueio: 'Defesa Capacitista',
     falas: {

@@ -6,14 +6,14 @@ class Fighter {
   constructor(charId, lado, controle) {
     this.char = CHARACTERS[charId]; this.id = charId; this.lado = lado; this.controle = controle; // 'p1' | 'p2' | 'cpu'
     this.meta = SPRITE_META[charId]; this.img = SPRITES[charId];
-    this.vitorias = 0; this.scratch = document.createElement('canvas'); this.scratch.width = 520; this.scratch.height = 420;
+    this.vitorias = 0; this.scratch = document.createElement('canvas');
     this.reset(0, 650, lado);
   }
   reset(x, chao, face) {
     this.x = x; this.y = chao; this.chao = chao; this.vx = 0; this.vy = 0; this.noChao = true; this.face = face;
     this.hp = this.char.hp; this.hpMax = this.char.hp; this.meter = 0; this.state = 'idle'; this.timer = 0; this.golpe = null;
     this.acertou = false; this.cooldown = 0; this.enxaqueca = 0; this.flash = 0; this.stun = 0; this.anguloKO = 0;
-    this.auraSom = 0; this.provocacao = 0; this.pulouAtaque = false;
+    this.auraSom = 0; this.provocacao = 0; this.pulouAtaque = false; this.vxAlvo = 0; this.squash = 0; this.andar = 0; this.rastro = []; this.buffer = null;
   }
   get vivo() { return this.hp > 0; }
   get ocupado() { return ['attack', 'dash', 'special', 'hit', 'ko', 'win'].includes(this.state); }
@@ -46,7 +46,10 @@ class Fighter {
     this.timer += dt; this.cooldown = Math.max(0, this.cooldown - dt); this.flash = Math.max(0, this.flash - dt);
     if (this.enxaqueca > 0) { this.enxaqueca -= dt; if (Math.random() < dt * 1.0 && this.vivo) this.hp = Math.max(1, this.hp - 1); }
     if (this.fala) { this.fala.t -= dt; if (this.fala.t <= 0) this.fala = null; }
-    const h = inp ? inp.held : {}, p = inp ? inp.pressed : {};
+    const h = inp ? inp.held : {}, p = Object.assign({}, inp ? inp.pressed : {});
+    // buffer de entrada: um golpe apertado um pouco antes de ficar livre sai assim que der (sem "engolir" comandos)
+    for (const acao of ['especial', 'poder', 'chute', 'soco']) if (p[acao] && !['idle', 'walk', 'jump', 'block'].includes(this.state)) { this.buffer = { acao, t: 0.22 }; break; }
+    if (this.buffer) { this.buffer.t -= dt; if (this.buffer.t <= 0) this.buffer = null; else if (['idle', 'walk'].includes(this.state) || (this.state === 'block' && !h.defesa)) { p[this.buffer.acao] = true; this.buffer = null; } }
     const esq = this.enxaqueca > 0 ? h.right : h.left, dir = this.enxaqueca > 0 ? h.left : h.right;
     const vel = this.char.velocidade;
 
@@ -58,9 +61,12 @@ class Fighter {
         if (p.poder && this.iniciar('poder')) break;
         if (p.soco && this.iniciar('soco')) break;
         if (p.chute && this.iniciar('chute')) break;
-        if (p.up && this.noChao) { this.vy = -this.char.pulo; this.noChao = false; this.state = 'jump'; Audio8.play('jump'); this.vx = (dir ? vel : 0) - (esq ? vel : 0); break; }
-        if (esq) this.vx = -vel; if (dir) this.vx = vel;
-        this.state = this.vx ? 'walk' : 'idle';
+        if (p.up && this.noChao) { this.vy = -this.char.pulo; this.noChao = false; this.state = 'jump'; Audio8.play('jump'); this.vx = (dir ? vel : 0) - (esq ? vel : 0); this.squash = -0.18; break; }
+        this.vxAlvo = (dir ? vel : 0) - (esq ? vel : 0);
+        this.vx = this.vx + (this.vxAlvo - this.vx) * Math.min(1, dt * 18);
+        if (Math.abs(this.vx) < 8 && !this.vxAlvo) this.vx = 0;
+        this.state = this.vxAlvo ? 'walk' : 'idle';
+        if (this.state === 'walk') this.andar += dt * 9;
         break;
       case 'jump':
         if (p.soco && this.iniciar('soco')) break;
@@ -74,6 +80,7 @@ class Fighter {
         const g = this.golpe, total = g.startup + (g.active || 0) + g.recovery;
         if (g.tipo === 'projetil' && !this.acertou && this.timer >= g.startup) { this.acertou = true; match.lancarProjetil(this, g); }
         if (this.noChao) this.vx = 0;
+        if (this.noChao && this.acertou && !g.tipo && this.fase() === 'recovery') { if ((p.especial && this.iniciar('especial')) || (p.poder && this.iniciar('poder')) || (p.chute && this.iniciar('chute')) || (p.soco && this.iniciar('soco'))) break; }
         if (this.timer >= total) { this.golpe = null; this.state = this.noChao ? 'idle' : 'jump'; }
         break;
       }
@@ -101,8 +108,11 @@ class Fighter {
       case 'win': this.vx = 0; break;
     }
     // física
-    if (!this.noChao) { this.vy += GRAVIDADE * dt; this.y += this.vy * dt; if (this.y >= this.chao) { this.y = this.chao; this.vy = 0; this.noChao = true; Audio8.play('land'); if (this.state === 'jump') this.state = 'idle'; if (this.state === 'attack' && this.pulouAtaque) { this.golpe = null; this.state = 'idle'; } this.pulouAtaque = false; } }
+    if (!this.noChao) { this.vy += GRAVIDADE * dt; this.y += this.vy * dt; if (this.y >= this.chao) { this.y = this.chao; this.vy = 0; this.noChao = true; Audio8.play('land'); this.squash = 0.22; if (this.state === 'jump') this.state = 'idle'; if (this.state === 'attack' && this.pulouAtaque) { this.golpe = null; this.state = 'idle'; } this.pulouAtaque = false; } }
     this.x += this.vx * dt;
+    this.squash *= Math.pow(0.001, dt);
+    if (this.state === 'dash' && this.fase() === 'active') { this.rastro.push({ x: this.x, y: this.y, face: this.face, t: 0.25 }); }
+    this.rastro = this.rastro.filter(r => (r.t -= dt) > 0);
     // provocação ocasional
     if ((this.state === 'idle' || this.state === 'walk') && this.vivo && !this.fala) { this.provocacao += dt; if (this.provocacao > 7 && Math.random() < dt * 0.25) { this.provocacao = 0; const f = this.char.falas.provocacoes; this.fala = { texto: f[Math.floor(Math.random() * f.length)], t: 1.8 }; } }
     if (this.hp < this.hpMax * 0.3 && this.vivo && this.char.pressao === 'sayajin') { this.auraSom -= dt; if (this.auraSom <= 0) { this.auraSom = 1.2; Audio8.play('aura'); } }
@@ -130,27 +140,48 @@ class Fighter {
       default: return 'parado';
     }
   }
-  draw(ctx, t) {
-    const pose = this.poseAtual(), img = this.img[pose], m = this.meta[pose]; if (!img || !m) return;
-    const sombraW = 120; ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(this.x, this.chao + 6, sombraW / 2, 10, 0, 0, 7); ctx.fill();
-    ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.face, 1);
-    // efeitos atrás do corpo
-    if (this.hp < this.hpMax * 0.3 && this.vivo && this.char.pressao === 'sayajin') aura(ctx, t, this.alturaCorpo);
-    let sx = 1, sy = 1, dx = 0;
-    if (this.state === 'idle') sy = 1 + Math.sin(t * 6) * 0.015;
-    if (this.state === 'walk') { sy = 1 + Math.sin(t * 14) * 0.03; dx = 0; }
-    if (this.state === 'attack' || this.state === 'dash') { const f = this.fase(); if (f === 'startup') { sx = 0.94; dx = -8; } else if (f === 'active') { sx = 1.04; dx = 14; } }
-    if (this.state === 'special') { const f = this.fase(); if (f === 'startup') { sx = 0.97 + Math.sin(t * 60) * 0.02; } }
-    if (this.state === 'hit') { dx = -6 + Math.sin(t * 90) * 5; }
-    if (this.state === 'win') { sy = 1 + Math.abs(Math.sin(t * 7)) * 0.06; }
-    if (this.state === 'ko') { ctx.rotate(-this.anguloKO * Math.PI / 2 * 0.95); ctx.translate(0, 0); }
-    ctx.translate(dx, 0); ctx.scale(sx, sy);
+  // pose de transição: durante startup/recovery mistura 'parado' com a pose do golpe
+  mistura() {
+    const g = this.golpe; if (!g || !['attack', 'dash', 'special'].includes(this.state)) return 1;
+    const f = this.fase(); const ativo = g.active || g.duracao || 0;
+    if (f === 'startup') return Math.min(1, this.timer / Math.max(0.001, g.startup));
+    if (f === 'recovery') { const rt = this.timer - g.startup - ativo, ini = Math.max(0, g.recovery - 0.12); return rt < ini ? 1 : Math.max(0, 1 - (rt - ini) / 0.12); }
+    return 1;
+  }
+  drawPose(ctx, pose, alpha) {
+    const img = this.img[pose], m = this.meta[pose]; if (!img || !m) return;
+    ctx.globalAlpha = alpha;
     if (this.flash > 0 || this.enxaqueca > 0) {
-      const sc = this.scratch, c2 = sc.getContext('2d'); c2.clearRect(0, 0, sc.width, sc.height);
-      c2.drawImage(img, 0, 0); c2.globalCompositeOperation = 'source-atop';
-      c2.fillStyle = this.flash > 0 ? 'rgba(255,40,40,.6)' : 'rgba(255,0,80,' + (0.25 + Math.sin(t * 20) * 0.15) + ')'; c2.fillRect(0, 0, sc.width, sc.height); c2.globalCompositeOperation = 'source-over';
-      ctx.drawImage(sc, 0, 0, img.width, img.height, -m.footX, -m.h, img.width, img.height);
-    } else ctx.drawImage(img, -m.footX, -m.h);
+      const sc = this.scratch, c2 = sc.getContext('2d');
+      if (sc.width !== img.width || sc.height !== img.height) { sc.width = img.width; sc.height = img.height; }
+      c2.clearRect(0, 0, sc.width, sc.height); c2.drawImage(img, 0, 0); c2.globalCompositeOperation = 'source-atop';
+      c2.fillStyle = this.flash > 0 ? 'rgba(255,40,40,.6)' : 'rgba(255,0,80,' + (0.25 + Math.sin(performance.now() / 50) * 0.15) + ')'; c2.fillRect(0, 0, sc.width, sc.height); c2.globalCompositeOperation = 'source-over';
+      ctx.drawImage(sc, -m.footX, -m.h, m.w, m.h);
+    } else ctx.drawImage(img, -m.footX, -m.h, m.w, m.h);
+    ctx.globalAlpha = 1;
+  }
+  draw(ctx, t) {
+    const pose = this.poseAtual(); if (!this.img[pose]) return;
+    // rastro do avanço
+    for (const r of this.rastro) { ctx.save(); ctx.globalAlpha = r.t * 1.6; ctx.translate(r.x, r.y); ctx.scale(r.face, 1); const m = this.meta.soco; ctx.drawImage(this.img.soco, -m.footX, -m.h, m.w, m.h); ctx.restore(); }
+    const sombraW = 120 + (this.chao - this.y) * 0.1; ctx.fillStyle = 'rgba(0,0,0,' + (0.28 - (this.chao - this.y) * 0.0004) + ')'; ctx.beginPath(); ctx.ellipse(this.x, this.chao + 6, sombraW / 2, 10, 0, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.face, 1);
+    if (this.hp < this.hpMax * 0.3 && this.vivo && this.char.pressao === 'sayajin') aura(ctx, t, this.alturaCorpo);
+    let sx = 1, sy = 1, dx = 0, rot = 0;
+    if (this.state === 'idle') { sy = 1 + Math.sin(t * 5) * 0.015; sx = 1 - Math.sin(t * 5) * 0.008; }
+    if (this.state === 'walk') { sy = 1 + Math.sin(this.andar) * 0.035; rot = Math.sign(this.vx) * this.face * 0.03; dx = Math.sin(this.andar * 0.5) * 3; }
+    if (this.state === 'jump') { sy = 1 + Math.max(-0.12, Math.min(0.12, -this.vy / 6000)); sx = 2 - sy; }
+    const mist = this.mistura();
+    if (this.state === 'attack' || this.state === 'dash') { const f = this.fase(); if (f === 'startup') { sx = 1 - 0.08 * (1 - mist); dx = -10 * (1 - mist); } else if (f === 'active') { sx = 1.04; dx = 14; } else { dx = 14 * mist; } }
+    if (this.state === 'special') { const f = this.fase(); if (f === 'startup') { sx = 0.97 + Math.sin(t * 60) * 0.02; } }
+    if (this.state === 'hit') { dx = -6 + Math.sin(t * 90) * 5; sx = 0.94; sy = 1.04; }
+    if (this.state === 'win') { sy = 1 + Math.abs(Math.sin(t * 7)) * 0.06; }
+    if (this.state === 'ko') { rot = -this.anguloKO * Math.PI / 2 * 0.95; }
+    sy *= 1 - this.squash; sx *= 1 + this.squash * 0.6;
+    ctx.rotate(rot); ctx.translate(dx, 0); ctx.scale(sx, sy);
+    if (mist < 1) { this.drawPose(ctx, 'parado', 1); this.drawPose(ctx, pose, mist); } else this.drawPose(ctx, pose, 1);
+    // arco de impacto (swoosh) nos quadros ativos de soco/chute
+    if (this.state === 'attack' && this.golpe && !this.golpe.tipo && this.fase() === 'active') { const g = this.golpe, cy = -(g.yTop + g.yBot) / 2, r = g.reach * 0.9; ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(20, cy, r, -0.55, 0.55); ctx.stroke(); ctx.strokeStyle = this.char.cor; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(20, cy, r - 12, -0.45, 0.45); ctx.stroke(); }
     ctx.restore();
     // efeitos na frente
     const topo = this.y - this.alturaCorpo;
