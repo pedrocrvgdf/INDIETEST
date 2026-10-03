@@ -1,0 +1,42 @@
+{
+ "parado": {
+  "w": 199,
+  "h": 360,
+  "footX": 96,
+  "footY": 360,
+  "bodyTop": 0,
+  "bodyH": 358
+ },
+ "soco": {
+  "w": 250,
+  "h": 334,
+  "footX": 127,
+  "footY": 334,
+  "bodyTop": 0,
+  "bodyH": 332
+ },
+ "chute": {
+  "w": 243,
+  "h": 352,
+  "footX": 105,
+  "footY": 352,
+  "bodyTop": 22,
+  "bodyH": 329
+ },
+ "defesa": {
+  "w": 224,
+  "h": 318,
+  "footX": 114,
+  "footY": 318,
+  "bodyTop": 0,
+  "bodyH": 317
+ },
+ "especial": {
+  "w": 379,
+  "h": 303,
+  "footX": 98,
+  "footY": 303,
+  "bodyTop": 0,
+  "bodyH": 301
+ }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1a3a">
+<title>CBV Fighter — Fechamento Edition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div id="touch" class="hidden">
+    <div class="pad left">
+      <button class="tbtn dir" data-key="left">◀</button>
+      <button class="tbtn dir up" data-key="up">▲</button>
+      <button class="tbtn dir" data-key="right">▶</button>
+    </div>
+    <div class="pad right">
+      <button class="tbtn atk defesa" data-key="defesa">DEFESA</button>
+      <button class="tbtn atk soco" data-key="soco">SOCO</button>
+      <button class="tbtn atk chute" data-key="chute">CHUTE</button>
+      <button class="tbtn atk poder" data-key="poder">PODER</button>
+      <button class="tbtn atk especial" data-key="especial">FECHAMENTO</button>
+    </div>
+    <button class="tbtn menu" data-key="pause">II</button>
+  </div>
+  <div id="rotate" class="hidden"><div>📱↻<br>Gire o celular para jogar na horizontal</div></div>
+</div>
+<script src="assets/sprites/meta.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/characters.js"></script>
+<script src="js/stages.js"></script>
+<script src="js/fighter.js"></script>
+<script src="js/match.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
